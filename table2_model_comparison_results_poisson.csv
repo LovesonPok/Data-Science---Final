@@ -1,0 +1,20 @@
+Formula,AIC,BIC,LogLikelihood,NumPredictors
+rat_arrival_number ~ 1 + food_availability + hours_after_sunset_d2 + season + season:hours_after_sunset_d2,2325.691110155456,2348.8180719954958,-1157.845555077728,4
+rat_arrival_number ~ 1 + food_availability + bat_landing_number + hours_after_sunset_d2 + season + season:hours_after_sunset_d2,2327.2598373648734,2355.012191572921,-1157.6299186824367,5
+rat_arrival_number ~ 1 + bat_landing_number + hours_after_sunset_d2 + season + season:hours_after_sunset_d2,2331.2941554955623,2354.421117335602,-1160.6470777477812,4
+rat_arrival_number ~ 1 + hours_after_sunset_d2 + season + season:hours_after_sunset_d2,2331.3186494044185,2349.8202188764503,-1161.6593247022092,3
+rat_arrival_number ~ 1 + hours_after_sunset_d2 + season,2356.3755490559765,2370.2517261600005,-1175.1877745279883,2
+rat_arrival_number ~ 1 + food_availability + hours_after_sunset_d2 + season,2357.927146265367,2376.4287157373988,-1174.9635731326835,3
+rat_arrival_number ~ 1 + bat_landing_number + hours_after_sunset_d2 + season,2357.9594229047675,2376.4609923767994,-1174.9797114523838,3
+rat_arrival_number ~ 1 + food_availability + bat_landing_number + hours_after_sunset_d2 + season,2359.7174343023216,2382.8443961423613,-1174.8587171511608,4
+rat_arrival_number ~ 1 + hours_after_sunset_d2,2377.8418576616227,2387.0926423976384,-1186.9209288308114,1
+rat_arrival_number ~ 1 + bat_landing_number + hours_after_sunset_d2,2378.2921720826685,2392.1683491866925,-1186.1460860413342,2
+rat_arrival_number ~ 1 + food_availability + hours_after_sunset_d2,2378.93780121635,2392.813978320374,-1186.468900608175,2
+rat_arrival_number ~ 1 + food_availability + bat_landing_number + hours_after_sunset_d2,2379.9366997855527,2398.4382692575846,-1185.9683498927764,3
+rat_arrival_number ~ 1 + food_availability + bat_landing_number + season,5924.053707939591,5947.213182175809,-2958.0268539697954,3
+rat_arrival_number ~ 1 + food_availability + season,5988.388515714402,6005.758121391566,-2991.194257857201,2
+rat_arrival_number ~ 1 + bat_landing_number + season,6002.579858828642,6019.949464505806,-2998.289929414321,2
+rat_arrival_number ~ 1 + season,6075.76574435998,6087.34548147809,-3035.88287217999,1
+rat_arrival_number ~ 1 + food_availability + bat_landing_number,6102.4388888101585,6119.808494487323,-3048.2194444050792,2
+rat_arrival_number ~ 1 + food_availability,6145.748595239001,6157.32833235711,-3070.8742976195003,1
+rat_arrival_number ~ 1 + bat_landing_number,6171.831814436968,6183.4115515550775,-3083.915907218484,1
