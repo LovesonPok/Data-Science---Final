@@ -1,6 +1,5 @@
 # Investigation A – Interaction test and alternate target
-# All the test for LR learned from week 8 and 9
-# all discussed in the meeting and chat with team
+# All the test for LR learned from week 8 and 9,
 
 from __future__ import annotations
 import numpy as np
@@ -87,7 +86,7 @@ if missing_A:
 
 A_df_full = to_num(df[cols_A].copy(), cols_A).dropna()
 
-# 80/20 split, more to 
+# 80/20 split
 A_train, A_test = train_test_split(A_df_full, test_size=0.2, random_state=42)
 
 formula_A = (
@@ -99,7 +98,7 @@ print("\n=== MODEL A (Integrated + Interaction):")
 modA = smf.ols(formula_A, data=A_train).fit()
 print(modA.summary())
 
-# Training metrics 
+# Training metrics (use model's adj R²)
 _ = print_fit_metrics("Model A – Train", modA.model.endog, modA.fittedvalues, adj_r2=modA.rsquared_adj)
 
 # Test predictions + metrics
