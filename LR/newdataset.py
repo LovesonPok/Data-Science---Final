@@ -17,6 +17,15 @@ OUT_CSV = Path("/Users/lovesonpokhrel/Documents/Data Science/CsvForInvesB.csv")
 df = pd.read_csv(CLEANED)
 eco = pd.read_csv(ECO_CSV)
 
+# Improving my mistake, as there were two months_d2 columnns,
+if "month_d1" in df.columns and "month_d2" in df.columns:
+    df["month"] = df["month_d1"].combine_first(df["month_d2"])
+elif "month_d1" in df.columns:
+    df["month"] = df["month_d1"]
+elif "month_d2" in df.columns:
+    df["month"] = df["month_d2"]
+# (Not dropping the original columns to avoid extra changes.)
+
 # --- Identify and convert time/date columns ---
 if "time" not in df.columns:
     raise SystemExit("Error: No 'time' column found in cleaned dataset.")

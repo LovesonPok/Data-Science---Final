@@ -1,6 +1,5 @@
 # Investigation B – Season-split models with ecological factors (AvgTempC, WindSpeedMph)
-# Linear regression, train/test evaluation, 10-row Actual vs Predicted tables,
-# and four visuals per season. Heatmaps issue solved,.
+# Strict model spec (no month terms), 80/20 train-test, aligned heatmaps built only from model columns.
 
 from __future__ import annotations
 import numpy as np
@@ -12,6 +11,7 @@ import statsmodels.formula.api as smf
 import statsmodels.api as sm
 from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
 from sklearn.model_selection import train_test_split
+import re
 import warnings
 warnings.filterwarnings("ignore", category=FutureWarning)
 
@@ -54,22 +54,7 @@ def print_fit_metrics(title: str, y, yhat, adj_r2: float | None = None):
         print(f"[{title}]  n={len(y)}  R²={r2:.3f}  Adj.R²={adj_r2:.3f}  RMSE={rmse:.3f}  NRMSE={nrm:.3f}  MAE={mae:.3f}")
     return {"n": len(y), "R2": r2, "AdjR2": adj_r2, "RMSE": rmse, "NRMSE": nrm, "MAE": mae}
 
-def _strip_and_dedupe(cols: list[str]) -> list[str]:
-    """Strip whitespace and dedupe duplicate names deterministically."""
-    base = [str(c).strip() for c in cols]
-    seen = {}
-    out = []
-    for c in base:
-        if c not in seen:
-            seen[c] = 1
-            out.append(c)
-        else:
-            seen[c] += 1
-            out.append(f"{c}_{seen[c]}")  
-    return out
-
 def _drop_constant_numeric(df_num: pd.DataFrame) -> pd.DataFrame:
-    """Drop numeric columns with zero variance (std == 0)."""
     if df_num.empty:
         return df_num
     std = df_num.std(numeric_only=True, ddof=0)
@@ -79,72 +64,46 @@ def _drop_constant_numeric(df_num: pd.DataFrame) -> pd.DataFrame:
         print(f"(Heatmap) Dropping constant columns (zero variance): {dropped}")
     return df_num[keep_cols]
 
-def save_heatmap(
-    df_sub: pd.DataFrame,
-    title: str,
-    path: Path,
-    var_order: list[str] | None = None
-) -> None:
-    
-    # numeric subset + clean names
-    num = df_sub.select_dtypes(include="number").copy()
+def save_heatmap_strict(df_sub: pd.DataFrame, title: str, path: Path, cols_for_heatmap: list[str]) -> None:
+    """Heatmap strictly from specified columns only (prevents stray fields like month_d1/d2)."""
+    num = df_sub[cols_for_heatmap].select_dtypes(include="number").copy()
     if num.shape[1] < 2:
         print(f"(Skip heatmap: not enough numeric columns for {title})")
         return
-
-    num.columns = _strip_and_dedupe(list(num.columns))
     num = _drop_constant_numeric(num)
-
     if num.shape[1] < 2:
         print(f"(Skip heatmap: not enough numeric columns after dropping constants for {title})")
         return
 
-    # Build correlation using numpy to avoid edge-case differences
+    # Correlation
     cols_num = list(num.columns)
     corr_mat = np.corrcoef(num.values, rowvar=False)
     corr = pd.DataFrame(corr_mat, index=cols_num, columns=cols_num)
 
-    # Consistent order for both axes
-    if var_order:
-        order = [c for c in var_order if c in corr.columns]
-        remainder = [c for c in corr.columns if c not in order]
-        order += remainder
-    else:
-        order = list(corr.columns)
-
+    # Order exactly as provided
+    order = [c for c in cols_for_heatmap if c in corr.columns]
     corr = corr.loc[order, order]
 
     print(f"\n=== Correlation Matrix: {title} ===")
     print(corr.round(3))
     print(f"(Debug) corr shape: {corr.shape}  labels: {len(order)}×{len(order)}")
 
-    # Plot 
     with sns.axes_style("ticks"):
-        fig, ax = plt.subplots(figsize=(16, 14))
+        fig, ax = plt.subplots(figsize=(14, 12))
         hm = sns.heatmap(
-            corr,
-            ax=ax,
-            cmap="coolwarm",
-            vmin=-1, vmax=1,
-            center=0,
-            annot=True, fmt=".2f",
-            annot_kws={"size": 7},
-            linewidths=0.5,
-            square=True,
-            cbar_kws={"shrink": 0.6},
-            xticklabels=order,   
-            yticklabels=order
+            corr, ax=ax, cmap="coolwarm", vmin=-1, vmax=1, center=0,
+            annot=True, fmt=".2f", annot_kws={"size": 7},
+            linewidths=0.5, square=True, cbar_kws={"shrink": 0.6},
+            xticklabels=order, yticklabels=order
         )
-
         ax.grid(False)
-        ax.set_xlabel("")
-        ax.set_ylabel("")
+        ax.set_xlabel(""); ax.set_ylabel("")
         ax.set_title(title, fontsize=14, pad=10)
         ax.tick_params(axis="x", labelrotation=60, labelsize=9)
         ax.tick_params(axis="y", labelrotation=0, labelsize=9)
         fig.tight_layout()
         fig.savefig(path, dpi=500)
-        plt.show()
+        plt.close(fig)
 
 def diagnostics(resid, fitted, title_prefix: str, path: Path) -> None:
     fig, ax = plt.subplots(1, 2, figsize=(14, 6))
@@ -154,33 +113,50 @@ def diagnostics(resid, fitted, title_prefix: str, path: Path) -> None:
     ax[0].set_xlabel("Fitted values"); ax[0].set_ylabel("Residuals")
     sm.qqplot(resid, line="45", fit=True, ax=ax[1])
     ax[1].set_title(f"{title_prefix}: Q–Q Plot")
-    plt.tight_layout()
-    plt.savefig(path, dpi=300)
-    plt.show()
+    plt.tight_layout(); plt.savefig(path, dpi=300); plt.close(fig)
 
 # ---------------------------
-# Columns and data prep
+#   y = bat_landing_number ~ seconds_after_rat_arrival + bat_landing_to_food + hours_after_sunset_d1 + risk
+#                            + rat_arrival_number + food_availability + rat_minutes + AvgTempC + WindSpeedMph
+#                            + rat_minutes:AvgTempC
 # ---------------------------
-cols = [
-    "bat_landing_number", "seconds_after_rat_arrival", "bat_landing_to_food",
-    "hours_after_sunset_d1", "risk", "season", "rat_arrival_number",
-    "food_availability", "rat_minutes", "AvgTempC", "WindSpeedMph"
+TARGET = "bat_landing_number"
+PREDICTORS = [
+    "seconds_after_rat_arrival",
+    "bat_landing_to_food",   # NOTE: if your CSV uses 'bat_landing_to_food' (with _to_), keep this EXACT spelling
+    "hours_after_sunset_d1",
+    "risk",
+    "rat_arrival_number",
+    "food_availability",
+    "rat_minutes",
+    "AvgTempC",
+    "WindSpeedMph"
 ]
-missing = [c for c in cols if c not in df.columns]
+# Columns to load & keep (target + predictors + season for splitting)
+BASE_COLS = [TARGET, "season"] + PREDICTORS
+
+month_like = [c for c in df.columns if re.match(r"^\s*month(\b|_.*)", str(c), flags=re.IGNORECASE)]
+if month_like:
+    print(f"(Clean) Dropping month-like columns not allowed by spec: {month_like}")
+    df = df.drop(columns=month_like)
+
+#Check required columns
+missing = [c for c in BASE_COLS if c not in df.columns]
 if missing:
     raise SystemExit(f"Missing required columns: {missing}")
 
-df = to_num(df, cols).dropna(subset=cols)
+#Restrict dataframe strictly to model columns only
+df = df[BASE_COLS].copy()
+
+#Ensure numeric types where needed
+df = to_num(df, BASE_COLS).dropna(subset=BASE_COLS)
 
 # Seasonal splits
 df0 = df[df["season"] == 0].copy()
 df1 = df[df["season"] == 1].copy()
 
-VAR_ORDER = [
-    "season", "bat_landing_to_food", "seconds_after_rat_arrival", "risk",
-    "hours_after_sunset_d1", "bat_landing_number", "food_availability",
-    "rat_minutes", "rat_arrival_number", "AvgTempC", "WindSpeedMph"
-]
+# For heatmap, use only these numeric columns (target + predictors)
+HEATMAP_COLS = [TARGET] + PREDICTORS
 
 # ---------------------------
 # Per-season modeling
@@ -192,10 +168,12 @@ def run_season_model(data: pd.DataFrame, season_label: str):
         return
 
     print(f"\n=== MODEL – SEASON {season_label} ===")
+    print("(Debug) Columns in this season's data:", list(data.columns))
 
-    # 80/20 split 
+    # 80/20 split
     train, test = train_test_split(data, test_size=0.2, random_state=42)
 
+    # Strict formula 
     formula = (
         "bat_landing_number ~ seconds_after_rat_arrival + bat_landing_to_food + "
         "hours_after_sunset_d1 + risk + rat_arrival_number + food_availability + "
@@ -213,45 +191,46 @@ def run_season_model(data: pd.DataFrame, season_label: str):
     test_pred = model.predict(test)
     _ = print_fit_metrics(
         f"Season {season_label} – Test",
-        test["bat_landing_number"], test_pred
+        test[TARGET], test_pred
     )
 
     # 10-row Actual vs Predicted
     comp = pd.DataFrame({
-        "Actual": test["bat_landing_number"].values,
+        "Actual": test[TARGET].values,
         "Predicted": test_pred.values
     }).reset_index(drop=True).head(10)
     print(f"\n--- Season {season_label}: Actual vs Predicted (first 10 test rows) ---")
     print(comp)
     comp.to_csv(OUT_DIR / f"Season{season_label}_Actual_vs_Predicted_head10.csv", index=False)
 
-    # ---- Plots (4 per model) ----
-    save_heatmap(
+    # ---- Strict heatmap: only model columns ----
+    save_heatmap_strict(
         data,
-        f"Heatmap – Season {season_label}",
+        f"Heatmap – Season {season_label} (Model cols only)",
         FIG_DIR / f"Season{season_label}_heatmap.png",
-        var_order=VAR_ORDER
+        cols_for_heatmap=HEATMAP_COLS
     )
 
+    # ---- Plots
     plt.figure(figsize=(8,6))
     sns.regplot(
-        data=data, x="rat_minutes", y="bat_landing_number",
+        data=data, x="rat_minutes", y=TARGET,
         scatter_kws={"alpha":0.45, "s":35}, line_kws={"color":"red","lw":2}
     )
-    plt.title(f"Season {season_label}: Bat landing number vs Rat minutes")
+    plt.title(f"Season {season_label}: {TARGET} vs rat_minutes")
     plt.tight_layout()
     plt.savefig(FIG_DIR / f"Season{season_label}_scatter_ratminutes.png", dpi=300)
-    plt.show()
+    plt.close()
 
     plt.figure(figsize=(8,6))
     sns.regplot(
-        data=data, x="AvgTempC", y="bat_landing_number",
+        data=data, x="AvgTempC", y=TARGET,
         scatter_kws={"alpha":0.45, "s":35}, line_kws={"color":"blue","lw":2}
     )
-    plt.title(f"Season {season_label}: Bat landing number vs Temperature")
+    plt.title(f"Season {season_label}: {TARGET} vs AvgTempC")
     plt.tight_layout()
     plt.savefig(FIG_DIR / f"Season{season_label}_scatter_temp.png", dpi=300)
-    plt.show()
+    plt.close()
 
     diagnostics(
         model.resid, model.fittedvalues,
