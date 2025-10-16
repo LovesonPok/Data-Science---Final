@@ -12,9 +12,7 @@ import statsmodels.api as sm
 from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
 from sklearn.model_selection import train_test_split
 
-# ---------------------------
 # Paths / Load
-# ---------------------------
 DATA = Path("/Users/lovesonpokhrel/Documents/Data Science/cleaned_dataset.csv")
 FIG_DIR = Path("/Users/lovesonpokhrel/Documents/Data Science/Figures")
 OUT_DIR = Path("/Users/lovesonpokhrel/Documents/Data Science/Outputs")
@@ -24,9 +22,7 @@ OUT_DIR.mkdir(parents=True, exist_ok=True)
 df = pd.read_csv(DATA)
 sns.set(style="whitegrid", context="talk")
 
-# ---------------------------
 # Helpers
-# ---------------------------
 def to_num(df_: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
     out = df_.copy()
     for c in cols:
@@ -72,9 +68,7 @@ def diagnostics(resid, fitted, title_prefix: str, path: Path) -> None:
     ax[1].set_title(f"{title_prefix}: Q–Q Plot")
     plt.tight_layout(); plt.savefig(path, dpi=300); plt.show()
 
-# ---------------------------
 # Model A — Integrated + Interaction (season × rat_minutes)
-# ---------------------------
 cols_A = [
     "bat_landing_to_food",
     "seconds_after_rat_arrival", "hours_after_sunset_d1", "risk", "season",
@@ -131,9 +125,7 @@ plt.savefig(FIG_DIR / "ModelA_scatter_food_vs_batlandingtofood.png", dpi=300); p
 
 diagnostics(modA.resid, modA.fittedvalues, "Model A (train fit)", FIG_DIR / "ModelA_diagnostics.png")
 
-# ---------------------------
 # Model B — Alternate target (bat_landing_number) with same predictors 
-# ---------------------------
 cols_B = [
     "bat_landing_number",
     "seconds_after_rat_arrival", "hours_after_sunset_d1", "risk", "season",

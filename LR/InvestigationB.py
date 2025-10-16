@@ -1,5 +1,5 @@
 # Investigation B – Season-split models with ecological factors (AvgTempC, WindSpeedMph)
-# Strict model spec (no month terms), 80/20 train-test, aligned heatmaps built only from model columns.
+# Strict model specs, 80/20 train-test, aligned heatmaps built only from model columns.
 
 from __future__ import annotations
 import numpy as np
@@ -15,9 +15,7 @@ import re
 import warnings
 warnings.filterwarnings("ignore", category=FutureWarning)
 
-# ---------------------------
-# Paths / Load
-# ---------------------------
+# Paths
 DATA = Path("/Users/lovesonpokhrel/Documents/Data Science/CsvForInvesB.csv")
 FIG_DIR = Path("/Users/lovesonpokhrel/Documents/Data Science/FiguresC")
 OUT_DIR = Path("/Users/lovesonpokhrel/Documents/Data Science/OutputsC")
@@ -27,9 +25,7 @@ OUT_DIR.mkdir(parents=True, exist_ok=True)
 df = pd.read_csv(DATA)
 sns.set(style="whitegrid", context="talk")
 
-# ---------------------------
 # Helpers
-# ---------------------------
 def to_num(df_: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
     out = df_.copy()
     for c in cols:
@@ -115,15 +111,13 @@ def diagnostics(resid, fitted, title_prefix: str, path: Path) -> None:
     ax[1].set_title(f"{title_prefix}: Q–Q Plot")
     plt.tight_layout(); plt.savefig(path, dpi=300); plt.close(fig)
 
-# ---------------------------
 #   y = bat_landing_number ~ seconds_after_rat_arrival + bat_landing_to_food + hours_after_sunset_d1 + risk
 #                            + rat_arrival_number + food_availability + rat_minutes + AvgTempC + WindSpeedMph
 #                            + rat_minutes:AvgTempC
-# ---------------------------
 TARGET = "bat_landing_number"
 PREDICTORS = [
     "seconds_after_rat_arrival",
-    "bat_landing_to_food",   # NOTE: if your CSV uses 'bat_landing_to_food' (with _to_), keep this EXACT spelling
+    "bat_landing_to_food",   
     "hours_after_sunset_d1",
     "risk",
     "rat_arrival_number",
@@ -158,9 +152,7 @@ df1 = df[df["season"] == 1].copy()
 # For heatmap, use only these numeric columns (target + predictors)
 HEATMAP_COLS = [TARGET] + PREDICTORS
 
-# ---------------------------
 # Per-season modeling
-# ---------------------------
 def run_season_model(data: pd.DataFrame, season_label: str):
     if data.empty:
         print(f"\n=== MODEL – SEASON {season_label} ===")
@@ -173,7 +165,6 @@ def run_season_model(data: pd.DataFrame, season_label: str):
     # 80/20 split
     train, test = train_test_split(data, test_size=0.2, random_state=42)
 
-    # Strict formula 
     formula = (
         "bat_landing_number ~ seconds_after_rat_arrival + bat_landing_to_food + "
         "hours_after_sunset_d1 + risk + rat_arrival_number + food_availability + "
@@ -203,7 +194,7 @@ def run_season_model(data: pd.DataFrame, season_label: str):
     print(comp)
     comp.to_csv(OUT_DIR / f"Season{season_label}_Actual_vs_Predicted_head10.csv", index=False)
 
-    # ---- Strict heatmap: only model columns ----
+    #Strict heatmap: only model columns
     save_heatmap_strict(
         data,
         f"Heatmap – Season {season_label} (Model cols only)",
@@ -211,7 +202,7 @@ def run_season_model(data: pd.DataFrame, season_label: str):
         cols_for_heatmap=HEATMAP_COLS
     )
 
-    # ---- Plots
+    # Plots
     plt.figure(figsize=(8,6))
     sns.regplot(
         data=data, x="rat_minutes", y=TARGET,
@@ -238,9 +229,7 @@ def run_season_model(data: pd.DataFrame, season_label: str):
         FIG_DIR / f"Season{season_label}_diagnostics.png"
     )
 
-# ---------------------------
 # Run both season models
-# ---------------------------
 run_season_model(df0, "0")
 run_season_model(df1, "1")
 
